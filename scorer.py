@@ -156,10 +156,17 @@ class Scorer():
 
     return score
     
-  def __call__(self, summary, j):
+  def __call__(self, summary, j, use_aggregator=True):
+    # evaluate a list of summaries
+    if isinstance(summary, list) and isinstance(j, list) and len(j) == len(summary):
+      scores = [self.compute_score(self.values["tokenizer"], self.values["n"], summary_single, j_single, self.scoring_fn) for summary_single, j_single in zip(summary, j)]
+      if use_aggregator:
+        return np.mean(scores)
+      else:
+        return scores
+    # evaluate a single summary
     return self.compute_score(self.values["tokenizer"], self.values["n"], summary, j, self.scoring_fn)
     
-
 class TokenizedText():
     def __init__(self, ids):
        self.ids = ids
