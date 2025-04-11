@@ -25,8 +25,10 @@ def matching_with_summary_ngrams(ngram, ngrams_in_summary):
     return ngram in ngrams_in_summary
 
 class Scorer():
-  def __init__(self, corpus, tokenizer, n, mode, mode_config, coverage_penalty="fixed"):
+  def __init__(self, corpus, tokenizer, n, mode, mode_config, coverage_penalty="fixed", scoring_fn=None):
 
+    self.scoring_fn = scoring_fn if scoring_fn else lambda z, r: np.tanh(z / r)
+    
     self.corpus = corpus
     idfs = {} #inverse document frequencies
     tfs_ = [] #term frequencies
@@ -153,6 +155,10 @@ class Scorer():
     score = rw * score / (epsilon + norm if normalize else 1)
 
     return score
+    
+  def __call__(self, summary, j):
+    return self.compute_score(self.values["tokenizer"], self.values["n"], summary, j, self.scoring_fn)
+    
 
 class TokenizedText():
     def __init__(self, ids):
@@ -176,6 +182,23 @@ class GPT2Tokenizer():
         self.__name__ = "gpt2-tokenizer"
     def encode(self, input):
         return TokenizedText(self.tokenizer(input).input_ids)
+
+def get_ibr_scorer(corpus):
+  """
+  Compute Importance-based Relevance score with default settings
+
+  - corpus : list of text documents
+
+  returns:
+  - Scorer object, that can be called to score summaries with respect to corpus documents
+  """
+  tokenizer = get_tokenizer([doc.lower() for doc in corpus], vocab_size=100)
+  mode_config={"k": 1.2, "b": 0.75}
+  scoring_fn = lambda z, r: np.tanh(z / r)
+  n = 3
+  mode = "tf-idf"
+  return Scorer(corpus, tokenizer, n, mode, mode_config, scoring_fn=scoring_fn)
+  
 
 def main(corpus, source_column, machine_summary_column, n=3, tokenizer_type="corpus", importance_score_type="tanh", mode="tf-idf"):
     if tokenizer_type=="corpus":
